@@ -147,17 +147,50 @@ def save_to_json(data, filename="rare_diseases.json"):
     with open(filename, mode='w', encoding='utf-8') as file:
         json.dump(data, file, indent=2, ensure_ascii=False)
 
+def load_existing_json(filename="rare_diseases.json"):
+    """Load existing JSON file if it exists"""
+    try:
+        with open(filename, mode='r', encoding='utf-8') as file:
+            return json.load(file)
+    except FileNotFoundError:
+        return []
+
+def append_to_json(new_data, filename="rare_diseases.json"):
+    """Append new data to existing JSON file"""
+    existing_data = load_existing_json(filename)
+    combined_data = existing_data + new_data
+    save_to_json(combined_data, filename)
+    return combined_data
+
 
 def scrape_diseases():
-    print("Collecting diseases from first page...")
-    soup = fetch_category_page(CATEGORY_URL)
-    if not soup:
-        print("Failed to fetch the category page.")
-        return
+    # Collect all disease URLs from all pages
+    current_url = CATEGORY_URL
+    page_count = 0
     
-    extract_disease_urls(soup)
-    print(f"Found {len(disease_urls)} diseases on first page.")
+    print("Collecting all disease URLs from category pages...")
     
+    while current_url:
+        page_count += 1
+        print(f"Fetching page {page_count}...")
+        
+        soup = fetch_category_page(current_url)
+        if not soup:
+            print(f"Failed to fetch page {page_count}.")
+            break
+        
+        next_url = extract_disease_urls(soup)
+        print(f"Found {len(disease_urls)} total diseases so far...")
+        
+        if next_url:
+            current_url = next_url
+            time.sleep(random.uniform(0.5, 1))  # Small delay between page fetches
+        else:
+            current_url = None
+    
+    print(f"\nTotal diseases collected: {len(disease_urls)} from {page_count} pages.")
+    
+    # Now scrape each disease page
     disease_data = []
     
     for i in range(len(disease_urls)):
@@ -181,13 +214,13 @@ def scrape_diseases():
                 'Management': management or 'N/A'
             })
         
-
-        time.sleep(random.uniform(1, 2))
+        time.sleep(random.uniform(1, 2))  # Delay between disease page fetches
     
-    # Save to JSON
+    # Save to JSON file
     save_to_json(disease_data, filename="rare_diseases.json")
     print(f"\n{'='*80}")
-    print(f"Successfully scraped {len(disease_data)} diseases. Data saved to 'rare_diseases.json'.")
+    print(f"Successfully scraped {len(disease_data)} diseases from {page_count} category pages.")
+    print(f"Data saved to 'rare_diseases.json'.")
     print("="*80)
 
 
