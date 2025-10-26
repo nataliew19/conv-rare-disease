@@ -1,0 +1,69 @@
+# {Disease name} ({Plain-language name})
+
+{One-sentence summary in plain language} [n]
+
+**Important safety note:** This article is for education only and does not replace advice from your clinician. If you have urgent symptoms, call emergency services.
+
+## 1. Quick Facts
+- Prevalence/incidence: {value, context} [n]
+- Typical age of onset: {value} [n]
+- Main symptoms: {3–6 bullets} [n]
+- Diagnosis: {core test/criteria} [n]
+- Cause/inheritance: {genetic/acquired; pattern if known} [n]
+- Treatment approach: {categories only} [n]
+- Prognosis: {plain summary} [n]
+
+## 2. Names and Classification
+- Synonyms: {list}
+- IDs: {OMIM/Orphanet if available}
+- Classification: {category} [n]
+
+## 3. What Happens in the Body
+{2–3 short paragraphs explaining mechanism and linking to symptoms} [n]
+
+## 4. Signs and Symptoms
+- Common: {bullets} [n]
+- Less common: {bullets} [n]
+- Red flags needing urgent care: {bullets} [n]
+
+## 5. How It Is Diagnosed
+- Clinical evaluation: {summary} [n]
+- Key tests and what results mean: {bullets} [n]
+- Differential diagnosis: {3–5 items with one-line distinctions} [n]
+
+## 6. How Common Is It?
+{short paragraph with numbers, geography, time period, confidence} [n]
+
+## 7. Causes and Genetics
+{genetic variants, inheritance, non-genetic causes, strength of evidence} [n]
+
+## 8. Treatment and Management (Education-only overview)
+### Medications
+{approved therapies with mechanism and evidence summary} [n]
+### Procedures/Devices
+{if applicable} [n]
+### Supportive Care
+{common strategies reported in guidelines} [n]
+### Monitoring
+{what clinicians often follow} [n]
+### Special Populations
+{pediatric/pregnancy if supported} [n]
+
+## 9. Prognosis and Living With the Condition
+{natural history and quality-of-life evidence} [n]
+
+## 10. Research and Clinical Trials
+{current directions and how trials are typically found} [n]
+
+## 11. Patient Resources
+- {Resource name – what it offers}
+- {Resource name – what it offers}
+
+## 12. What Is Not Known
+- {gap 1 with citation if available}
+- {gap 2}
+- {gap 3}
+- {gap 4}
+
+## 13. References
+{[1] … will be auto-rendered elsewhere}
