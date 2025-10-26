@@ -291,7 +291,8 @@ runs/
 tensorboard_logs/
 
 # Jupyter notebook outputs
-*.ipynb
+# *.ipynb
+# me want to commit the hw1 ipynb so i coment this out - josh
 
 # Large files that shouldn't be tracked
 *.zip
