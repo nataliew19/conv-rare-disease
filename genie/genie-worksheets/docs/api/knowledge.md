@@ -1,3 +1,0 @@
-# Knowledge
-
-::: src.worksheets.knowledge 
