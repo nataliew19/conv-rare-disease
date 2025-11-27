@@ -1,0 +1,38 @@
+# Genetic mutations in the dystrophin gene drive Duchenne Muscular Dystrophy progression and highlight urgent therapeutic needs
+
+This article is for education only and does not replace advice from your clinician.
+
+Duchenne muscular dystrophy (DMD) is a severe, progressive X‑linked neuromuscular disorder that causes early‑childhood onset weakness of skeletal, cardiac, and respiratory muscles.[1][2] It primarily affects males and results from mutations in the dystrophin gene that lead to little or no dystrophin protein.[1][4] Care relies on molecular diagnosis, multidisciplinary supportive management, and a growing portfolio of genetic and pharmacologic therapies under investigation.[23][44]
+
+## What is Duchenne muscular dystrophy?
+Duchenne muscular dystrophy is a progressive genetic disorder characterized by worsening muscle weakness and wasting affecting movement, the heart, and breathing muscles.[1] The condition arises from mutations in the dystrophin gene on the X chromosome, which reduce or abolish production of dystrophin and thereby compromise muscle cell integrity.[1][4] DMD is a rare disease but is the most common and severe form of muscular dystrophy in childhood.[1]
+
+## Genetics and pathophysiology
+DMD is caused by mutations in the dystrophin gene at Xp21, the largest known human gene; these variants include deletions, duplications, nonsense and splice‑site changes that commonly abolish functional dystrophin protein.[15][18] The inheritance pattern is X‑linked recessive: males with a pathogenic DMD allele are typically affected, while females are usually carriers and are often asymptomatic, although some carriers have symptoms for several biological reasons.[15][16][19][20] At the cellular level, absence of dystrophin destabilizes the linkage between the muscle fiber cytoskeleton and the extracellular matrix, producing membrane fragility, calcium overload, mitochondrial dysfunction, chronic inflammation, and progressive replacement of muscle by fibrotic and fatty tissue.[15][21][22]
+
+## Clinical features
+Symptoms usually begin in early childhood, commonly between ages 2 and 6, with progressive, symmetrical proximal muscle weakness that first affects the hips and thighs and later the shoulders and arms.[7][10] Typical early signs include delayed motor milestones, a waddling gait, frequent falls, enlarged calves from pseudohypertrophy, and the use of the hands to rise to standing (Gowers’ sign).[7][10][12] Over time, loss of ambulation usually occurs in adolescence and contractures, scoliosis, and fractures may complicate mobility.[10]
+
+DMD affects multiple organ systems: progressive cardiomyopathy and conduction abnormalities are common and are a major cause of morbidity and mortality; respiratory muscle weakness leads to hypoventilation and increased infection risk; gastrointestinal dysmotility may occur; and about one‑third of patients have neurocognitive or behavioral impairments related to dystrophin deficiency in the brain.[14][10]
+
+## Diagnosis
+Diagnosis begins with clinical assessment (history, developmental milestones, and characteristic signs such as Gowers’ sign and pseudohypertrophy) and measurement of serum creatine kinase, which is typically markedly elevated in affected young children.[23][24][27] Genetic testing of the dystrophin gene is the primary confirmatory test and, using a combination of deletion/duplication assays and sequencing, identifies the causal mutation in roughly 98% of cases.[23][28]
+
+When genetic testing is inconclusive, a muscle biopsy with dystrophin immunohistochemistry and western blotting can demonstrate absent or severely reduced dystrophin and help distinguish DMD from Becker muscular dystrophy (where dystrophin is present but reduced or abnormal in size).[23][30] Cardiac evaluation (ECG, echocardiography, cardiac MRI) and regular respiratory assessment (pulmonary function tests, sleep studies) are integral to diagnosis and ongoing monitoring because of the multisystem nature of the disease.[23][31][28]
+
+## Management and treatment
+Standard care combines disease‑modifying pharmacology when appropriate with ongoing, multidisciplinary supportive management. Longstanding corticosteroid treatment has been shown to slow muscle weakness progression and delay loss of ambulation, and corticosteroid use has been associated with improved survival in modern cohorts.[32][33] Multidisciplinary care practices include neuromuscular clinical oversight, cardiac and respiratory monitoring and interventions, physical and occupational therapies, orthotics, orthopedic surgery for severe scoliosis or contractures, nutritional and endocrine care, and psychosocial support.[23][28]
+
+Molecular and targeted therapeutic approaches are an active and expanding part of care. Adeno‑associated virus (AAV) micro‑dystrophin gene transfer (for example, delandistrogene moxeparvovec) has progressed through early trials and into advanced studies and regulatory review pathways.[45][44] Exon‑skipping and other mutation‑directed approaches remain central strategies in the field, and histone deacetylase inhibitors such as givinostat have been evaluated in advanced trials aiming to reduce inflammation and fibrosis.[43][45] Supportive interventions and close monitoring of cardiac and respiratory function remain essential components of clinical management.[23][28]
+
+## Prognosis and impact
+DMD follows a progressive course from early childhood through adolescence and into adulthood with rising multisystem complications. Historically, median survival was under 20 years, but with modern multidisciplinary care — including corticosteroids, cardioprotective drugs, and respiratory support — median life expectancy has increased over successive birth cohorts.[32][33] Reported median survival estimates rose from about 18.3 years in those born before 1970 to approximately 28–30 years in cohorts born after 1990, and with optimal care many people now survive into their 30s and 40s.[32][33][34][35] The condition imposes substantial physical and psychosocial burdens and markedly affects quality of life for patients and families.[37][38]
+
+## Research and clinical trials
+Current research targets both restoration of dystrophin and mitigation of downstream pathology. Major ongoing efforts include AAV micro‑dystrophin gene therapy programs (for example, EMBARK Phase 3 and related studies of delandistrogene moxeparvovec), cell‑based approaches such as Dystrophin Expressing Chimeric (DEC) cell therapy (DT‑DEC01), and continued development of exon‑skipping oligonucleotides under evaluation in trials such as DELIVER.[45][44][43] Investigational pharmacologic agents include vamorolone and givinostat, which have been tested in randomized and controlled studies to assess safety and functional outcomes.[45][46] Trials are increasingly using biomarkers, digital endpoints, and patient‑reported outcomes to measure effects on function, cardiac status, and quality of life.[44]
+
+## Gaps and uncertainties
+Epidemiologic estimates vary widely and are affected by geographic ascertainment bias, methodological heterogeneity, and inconsistent case ascertainment across studies, which limits precise prevalence estimates in many regions.[39][40] Major unmet needs remain for therapies that reliably prevent or reverse cardiac disease and that benefit non‑ambulatory patients. Long‑term safety and sustained effectiveness of newer gene and cell therapies remain under investigation.[39][44]
+
+## Safety considerations
+Investigational genetic and cell‑based therapies carry potential risks and uncertainties; long‑term safety and effectiveness continue to be evaluated in ongoing studies.[44]
