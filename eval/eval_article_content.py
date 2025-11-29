@@ -1,11 +1,12 @@
 """
 Article Content Evaluation Module
 
-Implements multiple evaluation metrics for rare disease articles' content:
-1. ROUGE scores (ROUGE-1, ROUGE-2, ROUGE-L)
-2. Entity recall using FLAIR NER
-3. Wikipedia criteria evaluation using Prometheus (4 aspects)
-4. Citation recall and precision using Mistral 7B-Instruct
+Implements evaluation metrics for rare disease articles' content:
+1. ROUGE scores (ROUGE-1, ROUGE-2, ROUGE-L) - Lin, 2004
+2. Entity recall using FLAIR NER - article-level entity recall
+
+To assess the full-length article quality, we adopt ROUGE scores (Lin, 2004) 
+and compute the entity recall at the article level based on FLAIR NER results.
 """
 
 from rouge_score import rouge_scorer
@@ -14,7 +15,150 @@ import re
 import requests
 from bs4 import BeautifulSoup
 from typing import Dict, List, Tuple, Optional
-from prometheus_evaluator import load_prometheus_model, evaluate_all_aspects
+from urllib.parse import urlparse
+import matplotlib
+matplotlib.use('Agg')  # Non-interactive backend
+import matplotlib.pyplot as plt
+from pathlib import Path
+
+
+# ============================================================================
+# Wikipedia Domain Ban - Coded Implementation
+# ============================================================================
+
+WIKIPEDIA_DOMAINS = {
+    'wikipedia.org',
+    'wikipedia.com',
+    'wikimedia.org',
+    'wikidata.org',
+    'wiktionary.org',
+    'wikiquote.org',
+    'wikibooks.org',
+    'wikisource.org',
+    'wikinews.org',
+    'wikiversity.org',
+    'wikivoyage.org',
+    'mediawiki.org',
+    'foundation.wikimedia.org'
+}
+
+WIKIPEDIA_SUBDOMAINS = {
+    'en.wikipedia.org',
+    'es.wikipedia.org',
+    'fr.wikipedia.org',
+    'de.wikipedia.org',
+    'it.wikipedia.org',
+    'pt.wikipedia.org',
+    'ru.wikipedia.org',
+    'ja.wikipedia.org',
+    'zh.wikipedia.org',
+    'ar.wikipedia.org',
+    # Add other language subdomains as needed
+}
+
+
+def is_wikipedia_url(url: str) -> bool:
+    """
+    Check if a URL belongs to Wikipedia or any Wikimedia project.
+    This is a coded check, not just natural language specification.
+    
+    Args:
+        url: URL string to check
+    
+    Returns:
+        True if URL is from Wikipedia/Wikimedia, False otherwise
+    """
+    if not url or not isinstance(url, str):
+        return False
+    
+    try:
+        parsed = urlparse(url.lower().strip())
+        domain = parsed.netloc.lower()
+        
+        # Check exact domain match
+        if domain in WIKIPEDIA_DOMAINS:
+            return True
+        
+        # Check if domain ends with any Wikipedia domain
+        for wiki_domain in WIKIPEDIA_DOMAINS:
+            if domain.endswith('.' + wiki_domain) or domain == wiki_domain:
+                return True
+        
+        # Check subdomain matches
+        if domain in WIKIPEDIA_SUBDOMAINS:
+            return True
+        
+        # Check for 'wikipedia' in domain (catch variations)
+        if 'wikipedia' in domain or 'wikimedia' in domain:
+            return True
+        
+        return False
+    except Exception:
+        # If parsing fails, check if 'wikipedia' or 'wiki' is in the URL string
+        url_lower = url.lower()
+        return 'wikipedia' in url_lower or ('wiki' in url_lower and 'media' in url_lower)
+
+
+def filter_wikipedia_urls(urls: List[str]) -> Tuple[List[str], List[str]]:
+    """
+    Filter out Wikipedia URLs from a list of URLs.
+    
+    Args:
+        urls: List of URL strings
+    
+    Returns:
+        Tuple of (filtered_urls, wikipedia_urls_removed)
+    """
+    filtered = []
+    removed = []
+    
+    for url in urls:
+        if is_wikipedia_url(url):
+            removed.append(url)
+        else:
+            filtered.append(url)
+    
+    return filtered, removed
+
+
+def extract_urls_from_text(text: str) -> List[str]:
+    """
+    Extract all URLs from text using regex.
+    
+    Args:
+        text: Text to extract URLs from
+    
+    Returns:
+        List of URL strings found in text
+    """
+    # Pattern to match URLs (http, https, www, etc.)
+    url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+|www\.[^\s<>"{}|\\^`\[\]]+'
+    urls = re.findall(url_pattern, text)
+    return urls
+
+
+def check_text_for_wikipedia_sources(text: str) -> Dict[str, any]:
+    """
+    Check text for Wikipedia sources and return statistics.
+    
+    Args:
+        text: Text to check
+    
+    Returns:
+        Dictionary with statistics about Wikipedia sources found
+    """
+    urls = extract_urls_from_text(text)
+    wikipedia_urls = [url for url in urls if is_wikipedia_url(url)]
+    non_wikipedia_urls = [url for url in urls if not is_wikipedia_url(url)]
+    
+    return {
+        'total_urls': len(urls),
+        'wikipedia_urls': wikipedia_urls,
+        'wikipedia_url_count': len(wikipedia_urls),
+        'non_wikipedia_urls': non_wikipedia_urls,
+        'non_wikipedia_url_count': len(non_wikipedia_urls),
+        'has_wikipedia_sources': len(wikipedia_urls) > 0
+    }
 
 
 def calculate_rouge_scores(generated_article: str, reference_article: str) -> Dict[str, float]:
@@ -96,6 +240,8 @@ def calculate_entity_recall(generated_article: str, reference_article: str, tagg
 def extract_citations(text: str) -> List[str]:
     """
     Extract citation markers from text (e.g., [1], [2], [1][2]).
+    Note: This function only extracts citation numbers, not URLs.
+    Wikipedia URL filtering is handled separately in citation verification.
     
     Args:
         text: Article text with citations
@@ -199,22 +345,109 @@ def clean_wikipedia_text(text: str) -> str:
     return text.strip()
 
 
+def visualize_rouge_scores(rouge_scores: Dict[str, float], output_path: str = "rouge_scores.png"):
+    """Create bar chart of ROUGE scores."""
+    fig, ax = plt.subplots(figsize=(8, 6))
+    
+    metrics = ['ROUGE-1', 'ROUGE-2', 'ROUGE-L']
+    scores = [rouge_scores['rouge1'], rouge_scores['rouge2'], rouge_scores['rougeL']]
+    
+    bars = ax.bar(metrics, scores, color=['#2E86AB', '#A23B72', '#F18F01'], alpha=0.8)
+    
+    for bar, score in zip(bars, scores):
+        height = bar.get_height()
+        ax.text(bar.get_x() + bar.get_width()/2., height + 0.01,
+                f'{score:.3f}', ha='center', va='bottom', fontweight='bold')
+    
+    ax.set_ylabel('F1 Score', fontweight='bold')
+    ax.set_title('ROUGE Scores: Generated vs Wikipedia Reference', fontweight='bold')
+    ax.set_ylim([0, 1.0])
+    ax.grid(axis='y', alpha=0.3)
+    
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"📊 ROUGE visualization saved: {output_path}")
+
+
+def visualize_entity_recall(
+    entity_recall: float,
+    reference_count: int,
+    generated_count: int,
+    matched_count: int,
+    output_path: str = "entity_recall.png"
+):
+    """Create visualization of entity recall metrics."""
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+    
+    # Left: Recall score
+    ax1.barh(['Entity Recall'], [entity_recall], color='#06A77D', alpha=0.8, height=0.5)
+    ax1.set_xlim([0, 1.0])
+    ax1.set_xlabel('Recall Score', fontweight='bold')
+    ax1.set_title('Entity Recall Score', fontweight='bold')
+    ax1.text(entity_recall + 0.05, 0, f'{entity_recall:.3f}', va='center', fontweight='bold')
+    ax1.grid(axis='x', alpha=0.3)
+    
+    # Right: Entity counts
+    categories = ['Reference', 'Generated', 'Matched']
+    counts = [reference_count, generated_count, matched_count]
+    bars = ax2.bar(categories, counts, color=['#2E86AB', '#A23B72', '#06A77D'], alpha=0.8)
+    
+    for bar, count in zip(bars, counts):
+        height = bar.get_height()
+        ax2.text(bar.get_x() + bar.get_width()/2., height + max(counts)*0.02,
+                f'{count}', ha='center', va='bottom', fontweight='bold')
+    
+    ax2.set_ylabel('Number of Entities', fontweight='bold')
+    ax2.set_title('Entity Counts', fontweight='bold')
+    ax2.grid(axis='y', alpha=0.3)
+    
+    plt.suptitle('FLAIR NER Entity Recall Analysis', fontweight='bold', y=1.02)
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"📊 Entity recall visualization saved: {output_path}")
+
+
 if __name__ == "__main__":
     # Reference article: Wikipedia article on Duchenne muscular dystrophy
+    # NOTE: We fetch Wikipedia for reference comparison, but we BAN Wikipedia
+    # sources from being used as citations in the generated article
     reference_url = "https://en.wikipedia.org/wiki/Duchenne_muscular_dystrophy"
     
     # Load generated article
-    generated_article_path = "../generated_example_DMD.md"
+    generated_article_path = "/Users/nnataliewang19/Documents/coterm q/fall cs 224v/conv-rare-disease/src/outputs/20251128-134246_wiki_min/hierarchical_report_RESULT.md"
     try:
         with open(generated_article_path, 'r', encoding='utf-8') as f:
             generated_article = f.read()
         print(f"Loaded generated article from {generated_article_path}")
+        
+        # Check for Wikipedia sources in generated article (BANNED)
+        print("\n" + "="*60)
+        print("CHECKING FOR BANNED WIKIPEDIA SOURCES IN GENERATED ARTICLE")
+        print("="*60)
+        wiki_check = check_text_for_wikipedia_sources(generated_article)
+        
+        if wiki_check['has_wikipedia_sources']:
+            print(f"WARNING: Found {wiki_check['wikipedia_url_count']} Wikipedia URL(s) in generated article!")
+            print("   Wikipedia sources are BANNED and should be removed:")
+            for url in wiki_check['wikipedia_urls']:
+                print(f"     - {url}")
+            print("\n   These URLs will be excluded from citation verification.")
+        else:
+            print("No Wikipedia sources found in generated article.")
+        
+        print(f"\n   Total URLs found: {wiki_check['total_urls']}")
+        print(f"   Non-Wikipedia URLs: {wiki_check['non_wikipedia_url_count']}")
+        print("="*60 + "\n")
+        
     except FileNotFoundError:
         print(f"Error: Could not find {generated_article_path}")
         generated_article = ""
     
-    # Fetch reference article from Wikipedia
+    # Fetch reference article from Wikipedia (for comparison only)
     print(f"Fetching reference article from {reference_url}...")
+    print("(Note: Wikipedia is used as REFERENCE for comparison, not as a citation source)")
     reference_article_raw = fetch_wikipedia_article(reference_url)
     
     if reference_article_raw:
@@ -227,6 +460,11 @@ if __name__ == "__main__":
         print(f"ROUGE-1: {rouge_scores['rouge1']:.4f}")
         print(f"ROUGE-2: {rouge_scores['rouge2']:.4f}")
         print(f"ROUGE-L: {rouge_scores['rougeL']:.4f}")
+        
+        # Visualize ROUGE scores
+        output_dir = Path("eval_outputs")
+        output_dir.mkdir(exist_ok=True)
+        visualize_rouge_scores(rouge_scores, str(output_dir / "rouge_scores.png"))
         
         # Calculate entity recall using Hugging Face Hub models (no local download)
         print("\nCalculating entity recall (loading NER model from Hugging Face Hub)...")
@@ -252,34 +490,22 @@ if __name__ == "__main__":
             print(f"  Generated entities: {len(generated_entities)}")
             print(f"  Matched entities: {len(matched_entities)}")
             
+            # Visualize entity recall
+            visualize_entity_recall(
+                entity_recall,
+                len(reference_entities),
+                len(generated_entities),
+                len(matched_entities),
+                str(output_dir / "entity_recall.png")
+            )
+            
         except Exception as e:
             print(f"Error loading NER model: {e}")
         
-        # Evaluate with Prometheus (4 Wikipedia criteria)
-        print("\nEvaluating with Prometheus (Wikipedia criteria)...")
-        try:
-            print("Loading Prometheus model (this may take a while on first use)...")
-            model, tokenizer = load_prometheus_model()
-            print("Prometheus model loaded successfully.")
-            
-            results = evaluate_all_aspects(generated_article, model, tokenizer)
-            
-            print(f"\nPrometheus Scores Summary:")
-            scores = {}
-            for aspect, result in results.items():
-                score = result['score']
-                scores[aspect] = score
-                print(f"  {aspect.capitalize()}: {score}/5")
-                if result['feedback']:
-                    print(f"    Feedback: {result['feedback'][:150]}...")
-            
-            if scores:
-                print(f"  Average: {sum(scores.values()) / len(scores):.2f}/5")
-            
-        except Exception as e:
-            print(f"Error loading Prometheus model: {e}")
-            print("Prometheus model will be downloaded from Hugging Face Hub on first use.")
-            print("Note: This is a large model (~13B parameters) and requires significant memory.")
+        # Note: Wikipedia criteria evaluation is handled by vertex_evaluator.py
+        # which uses Vertex AI Gemini models (more powerful than Prometheus)
+        print("\nNote: Wikipedia criteria evaluation (Interest, Coherence, Relevance, Coverage, Verifiability)")
+        print("      is handled separately using Vertex AI Gemini models via vertex_evaluator.py")
         
     else:
         print("Error: Could not fetch reference article from Wikipedia")
