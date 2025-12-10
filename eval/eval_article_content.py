@@ -416,7 +416,7 @@ if __name__ == "__main__":
     reference_url = "https://en.wikipedia.org/wiki/Duchenne_muscular_dystrophy"
     
     # Load generated article
-    generated_article_path = "/Users/nnataliewang19/Documents/coterm q/fall cs 224v/conv-rare-disease/src/outputs/20251128-134246_wiki_min/hierarchical_report_RESULT.md"
+    generated_article_path = "/Users/nnataliewang19/Documents/coterm q/fall cs 224v/conv-rare-disease/src/output/report_fabry_disease_20251130_191249.md"
     try:
         with open(generated_article_path, 'r', encoding='utf-8') as f:
             generated_article = f.read()

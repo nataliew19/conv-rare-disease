@@ -1,2 +1,16 @@
 requests==2.31.0
 beautifulsoup4==4.12.2
+streamlit
+
+# for inconsistency checker
+langchain>=0.2.7
+loguru
+langchain-community>=0.2.7
+markdown
+markdownify
+langchain-google-vertexai
+python-dotenv
+google-cloud-aiplatform
+vertexai
+tiktoken
+dspy-ai

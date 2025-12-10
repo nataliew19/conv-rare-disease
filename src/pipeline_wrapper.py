@@ -39,6 +39,7 @@ class VertexLLMClient:
     def __init__(self, project_id: Optional[str] = None, location: str = "us-central1", gcp_api_key: Optional[str] = None):
         if gcp_api_key and os.path.exists(gcp_api_key):
             os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = gcp_api_key
+            print(f"GOOGLE_APPLICATION_CREDENTIALS set to {gcp_api_key}")
             if not project_id:
                 try:
                     with open(gcp_api_key, 'r') as f:
