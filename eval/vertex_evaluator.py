@@ -474,7 +474,7 @@ def visualize_wikipedia_criteria(results: Dict[str, Any], model_name: str = "gem
 
 if __name__ == "__main__":
     # Load article to evaluate
-    article_path = Path("/Users/nnataliewang19/Documents/coterm q/fall cs 224v/conv-rare-disease/src/output/report_fabry_disease_20251130_191249.md")
+    article_path = Path("/Users/nnataliewang19/Documents/coterm q/fall cs 224v/conv-rare-disease/reports/report_rett_syndrome_20251209_070858.md")
     
     print("="*80)
     print("Wikipedia Criteria Evaluation (Vertex AI Gemini)")
