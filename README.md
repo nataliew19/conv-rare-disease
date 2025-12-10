@@ -48,6 +48,8 @@ Reports are saved to `src/output/` by default.
 
 After generating a report, you can evaluate it using the scripts in the `eval/` folder.
 
+Alternatively, you can find example generated reports in the report folder.
+
 ### 1. Content Evaluation (ROUGE scores, Entity Recall)
 
 ```bash
@@ -79,11 +81,6 @@ This evaluates the article on 5 Wikipedia criteria:
 - Coverage
 - Verifiability
 
-### 3. Citation Verification
-
-```bash
-python eval/citation_verifier.py
-```
 
 **Note:** Edit the script to set your report path before running.
 
