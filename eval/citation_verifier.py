@@ -400,6 +400,203 @@ def create_citation_mapping_from_sources(sources: List[Dict[str, Any]]) -> Dict[
     return citation_map
 
 
+# ============================================================================
+# Command-line execution
+# ============================================================================
+
+def load_article(article_path: str) -> str:
+    """Load article text from file."""
+    with open(article_path, 'r', encoding='utf-8') as f:
+        return f.read()
+
+
+def load_rag_response(rag_response_path: str):
+    """Load RAG response from JSON file."""
+    import json
+    import sys
+    from pathlib import Path
+    
+    # Try to import RagResponse - handle import path issues
+    try:
+        from src.src.dataclass import RagResponse
+    except ImportError:
+        try:
+            # Try alternative import path
+            import sys
+            from pathlib import Path
+            project_root = Path(__file__).parent.parent
+            if str(project_root) not in sys.path:
+                sys.path.insert(0, str(project_root))
+            from src.src.dataclass import RagResponse
+        except ImportError:
+            raise ImportError("Could not import RagResponse. Make sure src/src/dataclass.py is accessible.")
+    
+    with open(rag_response_path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+        return RagResponse.from_dict(data)
+
+
+def convert_rag_documents_to_sources(rag_response) -> list[dict]:
+    """
+    Convert RAG response documents to format expected by citation_verifier.
+    
+    Args:
+        rag_response: RagResponse object with cited_documents
+    
+    Returns:
+        List of source dictionaries with 'index', 'url', 'content' fields
+    """
+    sources = []
+    for i, doc in enumerate(rag_response.cited_documents, start=1):
+        # Combine all excerpts into a single content string
+        content = " ".join(doc.excerpts) if doc.excerpts else ""
+        
+        sources.append({
+            'index': str(i),  # Citation number (1-indexed)
+            'id': str(i),
+            'url': doc.url,
+            'content': content,
+            'text': content,  # Also provide as 'text' for compatibility
+            'title': doc.title
+        })
+    
+    return sources
+
+
+def main():
+    """Main entry point for command-line execution."""
+    import sys
+    import argparse
+    
+    parser = argparse.ArgumentParser(
+        description="Verify citations in an article using Mistral 7B-Instruct",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python eval/citation_verifier.py article.md rag_response.json
+  python eval/citation_verifier.py src/output/report.md src/output/rag_response.json
+        """
+    )
+    parser.add_argument(
+        'article_path',
+        type=str,
+        help='Path to article file (markdown with citations like [1], [2], etc.)'
+    )
+    parser.add_argument(
+        'rag_response_path',
+        type=str,
+        help='Path to RAG response JSON file (from pipeline_wrapper.py output)'
+    )
+    parser.add_argument(
+        '--model',
+        type=str,
+        default="mistralai/Mistral-7B-Instruct-v0.2",
+        help='Hugging Face model name (default: mistralai/Mistral-7B-Instruct-v0.2)'
+    )
+    parser.add_argument(
+        '--no-filter-wikipedia',
+        action='store_true',
+        help='Do not filter out Wikipedia sources (default: Wikipedia sources are excluded)'
+    )
+    
+    args = parser.parse_args()
+    
+    print("="*80)
+    print("Citation Verification")
+    print("="*80)
+    print(f"\n📄 Loading article from: {args.article_path}")
+    print(f"📄 Loading RAG response from: {args.rag_response_path}")
+    
+    # Load article
+    try:
+        article = load_article(args.article_path)
+        print(f"✅ Loaded article ({len(article)} characters)")
+    except FileNotFoundError:
+        print(f"❌ Error: Article not found at {args.article_path}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"❌ Error loading article: {e}")
+        sys.exit(1)
+    
+    # Load RAG response
+    try:
+        rag_response = load_rag_response(args.rag_response_path)
+        print(f"✅ Loaded RAG response ({len(rag_response.cited_documents)} cited documents)")
+    except FileNotFoundError:
+        print(f"❌ Error: RAG response not found at {args.rag_response_path}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"❌ Error loading RAG response: {e}")
+        sys.exit(1)
+    
+    # Convert RAG documents to citation mapping format
+    print("\n🔄 Converting sources to citation mapping...")
+    sources = convert_rag_documents_to_sources(rag_response)
+    citation_mapping = create_citation_mapping_from_sources(sources)
+    print(f"✅ Created citation mapping ({len(citation_mapping)} citations)")
+    
+    # Load Mistral model (this may take a while on first run)
+    print("\n🤖 Loading Mistral 7B-Instruct model...")
+    print("   (This may take a few minutes on first run)")
+    try:
+        model, tokenizer = load_mistral_model(model_name=args.model)
+        print("✅ Model loaded successfully")
+    except Exception as e:
+        print(f"❌ Error loading model: {e}")
+        print("   Make sure you have transformers and torch installed:")
+        print("   pip install transformers torch")
+        sys.exit(1)
+    
+    # Calculate citation metrics
+    print("\n🔍 Verifying citations...")
+    print("   (This may take a while depending on article length)")
+    
+    try:
+        results = calculate_citation_metrics(
+            article=article,
+            citation_to_passage=citation_mapping,
+            model=model,
+            tokenizer=tokenizer,
+            filter_wikipedia=not args.no_filter_wikipedia
+        )
+        
+        # Print results
+        print("\n" + "="*80)
+        print("📊 CITATION VERIFICATION RESULTS")
+        print("="*80)
+        print(f"\nCitation Recall: {results['citation_recall']:.2%}")
+        print(f"  ({results['entailed_sentences']}/{results['cited_sentences']} cited sentences are entailed)")
+        print(f"\nCitation Precision: {results['citation_precision']:.2%}")
+        print(f"  ({results['entailed_citations']}/{results['total_citations']} citations are entailed)")
+        print(f"\nTotal Sentences: {results['total_sentences']}")
+        print(f"Cited Sentences: {results['cited_sentences']}")
+        print(f"Total Citations: {results['total_citations']}")
+        
+        # Show some detailed results
+        if results.get('detailed_results'):
+            print("\n" + "-"*80)
+            print("📝 Sample Detailed Results (first 5):")
+            print("-"*80)
+            for i, detail in enumerate(results['detailed_results'][:5], 1):
+                print(f"\n{i}. Sentence: {detail['sentence']}")
+                print(f"   Citations: {detail['citations']}")
+                print(f"   Entailed: {'✅ Yes' if detail['entailed'] else '❌ No'}")
+                for cit_result in detail['citation_results']:
+                    status = "✅" if cit_result['entails'] else "❌"
+                    reason = cit_result.get('reason', '')
+                    print(f"     [{cit_result['citation']}] {status} {reason}")
+        
+        print("\n" + "="*80)
+        
+    except Exception as e:
+        print(f"\n❌ Error during citation verification: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
 
 
 

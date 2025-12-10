@@ -139,15 +139,133 @@ def trim_article_to_word_limit(text: str, max_words: int = 3000) -> str:
     return ' '.join(words[:max_words])
 
 
+def _extract_score_from_response(response: str) -> tuple[Optional[int], str]:
+    """
+    Extract score from response using multiple approaches.
+    
+    Returns:
+        Tuple of (score, feedback) where score is 1-5 or None if not found
+    """
+    # Ensure response is a string
+    if not isinstance(response, str):
+        response = str(response)
+    
+    # Normalize response: remove markdown formatting, normalize whitespace
+    response_normalized = re.sub(r'\*\*|__|\*|_', '', response)  # Remove bold/italic
+    response_normalized = re.sub(r'\s+', ' ', response_normalized)  # Normalize whitespace
+    
+    # Extract score - try multiple approaches
+    score = None
+    
+    # Approach 1: Try explicit patterns (case-insensitive, flexible whitespace)
+    score_patterns = [
+        r'Score\s*:?\s*(\d+)',
+        r'score\s*:?\s*(\d+)',
+        r'\[RESULT\]\s*(\d+)',
+        r'(\d+)\s*/?\s*5',
+        r'score\s+of\s+(\d+)',
+        r'rating\s*:?\s*(\d+)',
+        r'grade\s*:?\s*(\d+)'
+    ]
+    
+    for pattern in score_patterns:
+        score_match = re.search(pattern, response_normalized, re.IGNORECASE)
+        if score_match:
+            try:
+                score = int(score_match.group(1))
+                if 1 <= score <= 5:
+                    break
+            except (ValueError, IndexError):
+                continue
+    
+    # Approach 2: Find any number 1-5 near "score" keyword
+    if not score:
+        # Look in a wider context around "score"
+        score_context = re.search(r'(?:score|rating|grade).{0,50}(\d+)', response_normalized, re.IGNORECASE)
+        if score_context:
+            try:
+                num = int(score_context.group(1))
+                if 1 <= num <= 5:
+                    score = num
+            except (ValueError, IndexError):
+                pass
+    
+    # Approach 3: Look for score after "Feedback:" section (common pattern)
+    if not score:
+        # Split by "Feedback:" and look for score in the second part
+        parts = re.split(r'Feedback\s*:', response_normalized, flags=re.IGNORECASE)
+        if len(parts) > 1:
+            after_feedback = parts[1]
+            # Look for "Score:" or just a number 1-5 in this section
+            score_match = re.search(r'Score\s*:?\s*(\d+)', after_feedback, re.IGNORECASE)
+            if score_match:
+                try:
+                    score = int(score_match.group(1))
+                    if 1 <= score <= 5:
+                        pass  # score is set
+                except (ValueError, IndexError):
+                    pass
+    
+    # Approach 4: Find any standalone digit 1-5 (prefer numbers near end)
+    if not score:
+        all_numbers = re.findall(r'\b([1-5])\b', response_normalized)
+        if all_numbers:
+            # Prefer numbers in the last 100 chars (where score usually appears)
+            last_part = response_normalized[-100:]
+            last_numbers = re.findall(r'\b([1-5])\b', last_part)
+            if last_numbers:
+                score = int(last_numbers[-1])
+            else:
+                score = int(all_numbers[-1])
+    
+    # Approach 5: If response ends without score, try to infer from feedback quality
+    # Look for quality indicators in the last part of response
+    if not score:
+        last_part = response_normalized[-200:].lower()
+        # Look for quality words that might indicate score
+        if any(word in last_part for word in ['excellent', 'outstanding', 'exceptional', 'exemplary']):
+            score = 5
+        elif any(word in last_part for word in ['very good', 'quite good', 'well', 'strong']):
+            score = 4
+        elif any(word in last_part for word in ['adequate', 'acceptable', 'moderate', 'reasonable']):
+            score = 3
+        elif any(word in last_part for word in ['poor', 'lacking', 'weak', 'inadequate']):
+            score = 2
+        elif any(word in last_part for word in ['very poor', 'severely', 'extremely poor']):
+            score = 1
+    
+    # Approach 6: Absolute last resort - find ANY digit 1-5 in response
+    if not score:
+        # Search the original response (not normalized) for any 1-5
+        for char in reversed(response):
+            if char.isdigit() and '1' <= char <= '5':
+                score = int(char)
+                break
+    
+    # Extract feedback
+    feedback = response.strip()
+    if score:
+        # If we found a score, try to extract feedback before it
+        feedback_match = re.search(r'(.+?)(?:Score:|score:|\d+/5|$)', response, re.DOTALL | re.IGNORECASE)
+        if feedback_match:
+            feedback = feedback_match.group(1).strip()
+            if len(feedback) < 20:  # If too short, use full response
+                feedback = response.strip()
+    
+    return score, feedback
+
+
 def evaluate_with_vertex_ai(
     article: str, 
     aspect: str, 
     vertex_client, 
     model_name: str = "gemini-2.5-pro",
-    temperature: float = 0.2
+    temperature: float = 0.2,
+    max_retries: int = 5
 ) -> Dict[str, Any]:
     """
     Evaluate article using Vertex AI Gemini model on a specific aspect.
+    Retries evaluation if score cannot be extracted from response.
     
     Args:
         article: Article text (will be trimmed to 3000 words if needed)
@@ -155,6 +273,7 @@ def evaluate_with_vertex_ai(
         vertex_client: Vertex AI client instance
         model_name: Gemini model name (default: gemini-2.5-pro)
         temperature: Generation temperature (default: 0.2 for consistent evaluation)
+        max_retries: Maximum number of retry attempts if score extraction fails (default: 5)
     
     Returns:
         Dictionary with score and feedback
@@ -176,147 +295,72 @@ Provide your evaluation in this exact format:
 
 Feedback: [your assessment]
 
-Score: [1, 2, 3, 4, or 5]
+Score: [1, 2, 3, 4, or 5] - you MUST return a single digit for each criteria of Interest, Coherence, Relevance, Coverage, and Verifiability.
 
 Evaluation:"""
     
     try:
-        # Call Vertex AI - increase max_tokens to ensure we get the score
-        response = vertex_client.generate(
-            prompt,
-            model=model_name,
-            temperature=temperature,
-            max_tokens=2048  # Increased to ensure score is included
-        )
-        
-        if not response:
-            return {
-                'score': None,
-                'feedback': "Empty response from Vertex AI",
-                'aspect': aspect,
-                'error': 'Empty response'
-            }
-        
-        # Ensure response is a string
-        if not isinstance(response, str):
-            response = str(response)
-        
-        # Normalize response: remove markdown formatting, normalize whitespace
-        response_normalized = re.sub(r'\*\*|__|\*|_', '', response)  # Remove bold/italic
-        response_normalized = re.sub(r'\s+', ' ', response_normalized)  # Normalize whitespace
-        
-        # Debug: print first 300 chars of response
-        print(f"    Response preview: {response[:300]}...")
-        
-        # Extract score - try multiple approaches
-        score = None
-        
-        # Approach 1: Try explicit patterns (case-insensitive, flexible whitespace)
-        score_patterns = [
-            r'Score\s*:?\s*(\d+)',
-            r'score\s*:?\s*(\d+)',
-            r'\[RESULT\]\s*(\d+)',
-            r'(\d+)\s*/?\s*5',
-            r'score\s+of\s+(\d+)',
-            r'rating\s*:?\s*(\d+)',
-            r'grade\s*:?\s*(\d+)'
-        ]
-        
-        for pattern in score_patterns:
-            score_match = re.search(pattern, response_normalized, re.IGNORECASE)
-            if score_match:
-                try:
-                    score = int(score_match.group(1))
-                    if 1 <= score <= 5:
-                        break
-                except (ValueError, IndexError):
+        # Retry loop: keep trying until we extract a score or hit max retries
+        for attempt in range(1, max_retries + 1):
+            # Slightly increase temperature on retries to get different responses
+            current_temp = temperature + (attempt - 1) * 0.1 if attempt > 1 else temperature
+            
+            # Call Vertex AI - increase max_tokens to ensure we get the score
+            response = vertex_client.generate(
+                prompt,
+                model=model_name,
+                temperature=current_temp,
+                max_tokens=2048  # Increased to ensure score is included
+            )
+            
+            if not response:
+                if attempt < max_retries:
+                    print(f"    ⚠️  Empty response on attempt {attempt}/{max_retries}, retrying...")
                     continue
-        
-        # Approach 2: Find any number 1-5 near "score" keyword
-        if not score:
-            # Look in a wider context around "score"
-            score_context = re.search(r'(?:score|rating|grade).{0,50}(\d+)', response_normalized, re.IGNORECASE)
-            if score_context:
-                try:
-                    num = int(score_context.group(1))
-                    if 1 <= num <= 5:
-                        score = num
-                except (ValueError, IndexError):
-                    pass
-        
-        # Approach 3: Look for score after "Feedback:" section (common pattern)
-        if not score:
-            # Split by "Feedback:" and look for score in the second part
-            parts = re.split(r'Feedback\s*:', response_normalized, flags=re.IGNORECASE)
-            if len(parts) > 1:
-                after_feedback = parts[1]
-                # Look for "Score:" or just a number 1-5 in this section
-                score_match = re.search(r'Score\s*:?\s*(\d+)', after_feedback, re.IGNORECASE)
-                if score_match:
-                    try:
-                        score = int(score_match.group(1))
-                        if 1 <= score <= 5:
-                            pass  # score is set
-                    except (ValueError, IndexError):
-                        pass
-        
-        # Approach 4: Find any standalone digit 1-5 (prefer numbers near end)
-        if not score:
-            all_numbers = re.findall(r'\b([1-5])\b', response_normalized)
-            if all_numbers:
-                # Prefer numbers in the last 100 chars (where score usually appears)
-                last_part = response_normalized[-100:]
-                last_numbers = re.findall(r'\b([1-5])\b', last_part)
-                if last_numbers:
-                    score = int(last_numbers[-1])
+                return {
+                    'score': None,
+                    'feedback': "Empty response from Vertex AI",
+                    'aspect': aspect,
+                    'error': 'Empty response'
+                }
+            
+            # Debug: print first 300 chars of response
+            if attempt == 1:
+                print(f"    Response preview: {response[:300]}...")
+            else:
+                print(f"    Retry {attempt}/{max_retries} - Response preview: {response[:300]}...")
+            
+            # Extract score from response
+            score, feedback = _extract_score_from_response(response)
+            
+            if score is not None:
+                print(f"    ✅ Extracted score: {score}")
+                return {
+                    'score': score,
+                    'feedback': feedback,
+                    'aspect': aspect,
+                    'model': model_name,
+                    'raw_response': None,
+                    'attempts': attempt
+                }
+            else:
+                if attempt < max_retries:
+                    print(f"    ⚠️  Could not extract score on attempt {attempt}/{max_retries}, retrying...")
+                    print(f"    Last 200 chars: {response[-200:]}")
                 else:
-                    score = int(all_numbers[-1])
+                    print(f"    ⚠️  Could not extract score after {max_retries} attempts")
+                    print(f"    Full response length: {len(response)} chars")
+                    print(f"    Last 200 chars: {response[-200:]}")
         
-        # Approach 5: If response ends without score, try to infer from feedback quality
-        # Look for quality indicators in the last part of response
-        if not score:
-            last_part = response_normalized[-200:].lower()
-            # Look for quality words that might indicate score
-            if any(word in last_part for word in ['excellent', 'outstanding', 'exceptional', 'exemplary']):
-                score = 5
-            elif any(word in last_part for word in ['very good', 'quite good', 'well', 'strong']):
-                score = 4
-            elif any(word in last_part for word in ['adequate', 'acceptable', 'moderate', 'reasonable']):
-                score = 3
-            elif any(word in last_part for word in ['poor', 'lacking', 'weak', 'inadequate']):
-                score = 2
-            elif any(word in last_part for word in ['very poor', 'severely', 'extremely poor']):
-                score = 1
-        
-        # Approach 6: Absolute last resort - find ANY digit 1-5 in response
-        if not score:
-            # Search the original response (not normalized) for any 1-5
-            for char in reversed(response):
-                if char.isdigit() and '1' <= char <= '5':
-                    score = int(char)
-                    break
-        
-        # Extract feedback
-        feedback = response.strip()
-        if score:
-            # If we found a score, try to extract feedback before it
-            feedback_match = re.search(r'(.+?)(?:Score:|score:|\d+/5|$)', response, re.DOTALL | re.IGNORECASE)
-            if feedback_match:
-                feedback = feedback_match.group(1).strip()
-                if len(feedback) < 20:  # If too short, use full response
-                    feedback = response.strip()
-            print(f"    ✅ Extracted score: {score}")
-        else:
-            print(f"    ⚠️  Could not extract score from response")
-            print(f"    Full response length: {len(response)} chars")
-            print(f"    Last 200 chars: {response[-200:]}")
-        
+        # If we get here, all retries failed
         return {
-            'score': score,
-            'feedback': feedback,
+            'score': None,
+            'feedback': feedback if 'feedback' in locals() else "Could not extract score after multiple attempts",
             'aspect': aspect,
             'model': model_name,
-            'raw_response': response[:500] if not score else None  # Include raw response if score extraction failed
+            'raw_response': response[:500] if 'response' in locals() else None,
+            'error': 'Score extraction failed after all retries',
+            'attempts': max_retries
         }
         
     except Exception as e:
@@ -430,7 +474,7 @@ def visualize_wikipedia_criteria(results: Dict[str, Any], model_name: str = "gem
 
 if __name__ == "__main__":
     # Load article to evaluate
-    article_path = Path("/Users/nnataliewang19/Documents/coterm q/fall cs 224v/conv-rare-disease/src/outputs/20251128-134246_wiki_min/hierarchical_report_RESULT.md")
+    article_path = Path("/Users/nnataliewang19/Documents/coterm q/fall cs 224v/conv-rare-disease/src/output/report_fabry_disease_20251130_191249.md")
     
     print("="*80)
     print("Wikipedia Criteria Evaluation (Vertex AI Gemini)")
